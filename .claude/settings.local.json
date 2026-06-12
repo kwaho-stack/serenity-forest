@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import PIL; print\\('Pillow', PIL.__version__\\)\")",
+      "Bash(python -m pip install --quiet Pillow)",
+      "Bash(python -c \"import PIL; print\\('OK', PIL.__version__\\)\")",
+      "Bash(python -)",
+      "PowerShell(Start-Process python -ArgumentList '-m','http.server','8000' -WindowStyle Hidden; Start-Sleep -Seconds 1; \\(Invoke-WebRequest -Uri 'http://localhost:8000/serenity-forest.html' -UseBasicParsing -TimeoutSec 5\\).StatusCode)",
+      "Bash(git --version)",
+      "Bash(gh --version)",
+      "Bash(gh auth *)",
+      "PowerShell(git init -b main 2>$null)",
+      "PowerShell(git config user.email \"ghlyt1992@gmail.com\")",
+      "PowerShell(git config user.name \"ghl19\")",
+      "PowerShell(git add index.html manifest.webmanifest icons .nojekyll)",
+      "PowerShell(\"---\")",
+      "PowerShell(\"---tracked files---\")",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); $gh = Get-Command gh -ErrorAction SilentlyContinue; if \\($gh\\) { gh --version | Select-Object -First 1; \"PATH_OK: \" + $gh.Source } else { \"gh still not on PATH\" })",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); Set-Content -Path \"$env:TEMP\\\\pages.json\" -Value '{\"source\":{\"branch\":\"main\",\"path\":\"/\"}}' -Encoding ascii -NoNewline; gh api -X POST repos/kwaho-stack/serenity-forest/pages --input \"$env:TEMP\\\\pages.json\" 2>&1 | Select-Object -First 20; Remove-Item \"$env:TEMP\\\\pages.json\" -ErrorAction SilentlyContinue)"
+    ]
+  }
+}
