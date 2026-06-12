@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Serenity — 평온</title>
+
+<!-- iOS 홈 화면 앱 (Add to Home Screen) -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="평온" />
+<meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+
+<!--
+═══════════════════════════════════════════════════════════════════
+  Serenity — 미니멀 리디자인 (Apple.com 디자인 언어 참조)
+  · 일러스트 전면 제거, 여백·타이포·버튼만으로 구성
+  · 시스템 폰트 느낌(Pretendard), iOS 세그먼트 컨트롤, 알약 CTA
+  · 라이트/다크 자동 + 토글 (HSP 야간 사용 배려)
+  · 기능: Web Audio 합성 사운드 4종(외부 파일 0), 호흡 가이드, 타이머
+  ⚠ AudioContext 생성/resume은 버튼 탭 핸들러 안에서만 (자동재생 정책)
+═══════════════════════════════════════════════════════════════════
+-->
+
+<style>
+:root {
+  --bg: #fbfbfd;
+  --text: #1d1d1f;
+  --sub: #86868b;
+  --surface: #ececef;
+  --surface-2: #f5f5f7;
+  --accent: #2c8c69;
+  --accent-press: #247355;
+  --hairline: rgba(0,0,0,0.08);
+  --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 6px 20px rgba(0,0,0,0.06);
+  --ease: cubic-bezier(0.28, 0.11, 0.32, 1);
+}
+[data-theme="dark"] {
+  --bg: #000000;
+  --text: #f5f5f7;
+  --sub: #86868b;
+  --surface: #1d1d1f;
+  --surface-2: #1d1d1f;
+  --accent: #3aa57d;
+  --accent-press: #2e8a67;
+  --hairline: rgba(255,255,255,0.12);
+  --shadow: 0 1px 3px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.4);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 600ms var(--ease), color 600ms var(--ease);
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: max(20px, env(safe-area-inset-top)) 24px max(28px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 상단 바 ── */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+}
+.wordmark {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.wordmark span { color: var(--accent); }
+.icon-btn {
+  width: 44px; height: 44px;
+  margin-right: -10px;
+  border: none; background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: grid; place-items: center;
+  transition: background 300ms var(--ease), transform 200ms var(--ease);
+}
+.icon-btn:hover { background: var(--surface); }
+.icon-btn:active { transform: scale(0.9); }
+
+/* ── 히어로 ── */
+.hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0;
+}
+
+.eyebrow {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  margin-bottom: 14px;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: rise 900ms var(--ease) 120ms forwards;
+}
+h1.title {
+  font-size: clamp(56px, 19vw, 88px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: rise 900ms var(--ease) 200ms forwards;
+}
+h1.title .dot { color: var(--accent); }
+.subtitle {
+  margin-top: 20px;
+  max-width: 300px;
+  font-size: 18px;
+  line-height: 1.5;
+  font-weight: 400;
+  color: var(--sub);
+  letter-spacing: -0.01em;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: rise 900ms var(--ease) 320ms forwards;
+}
+@keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+/* ── 호흡 링 + CTA ── */
+.cta-zone {
+  position: relative;
+  margin-top: 44px;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: rise 900ms var(--ease) 440ms forwards;
+}
+.breath-ring {
+  position: absolute;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 68%);
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 800ms var(--ease);
+  pointer-events: none;
+}
+#app.calm .breath-ring {
+  opacity: 1;
+  animation: breathe 9s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(0.7); }
+  50%      { transform: scale(1.18); }
+}
+
+.cta {
+  position: relative;
+  min-width: 220px;
+  min-height: 56px;
+  padding: 0 34px;
+  border: none;
+  border-radius: 980px;
+  background: var(--accent);
+  color: #fff;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: background 300ms var(--ease), transform 200ms var(--ease), box-shadow 300ms var(--ease);
+}
+.cta:hover { background: var(--accent-press); }
+.cta:active { transform: scale(0.97); }
+#app.calm .cta {
+  background: transparent;
+  color: var(--text);
+  box-shadow: inset 0 0 0 1.5px var(--hairline);
+}
+#app.calm .cta:hover { background: var(--surface); }
+
+.timer {
+  height: 0;
+  overflow: hidden;
+  font-size: 52px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 700ms var(--ease), transform 700ms var(--ease), height 700ms var(--ease), margin 700ms var(--ease);
+}
+#app.calm .timer {
+  height: 60px;
+  margin-bottom: 8px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── 하단: 사운드 세그먼트 ── */
+.dock {
+  margin-top: auto;
+  padding-top: 28px;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: rise 900ms var(--ease) 560ms forwards;
+}
+.dock-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 4px 10px;
+}
+.dock-label .t {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sub);
+  letter-spacing: 0.01em;
+}
+.mute {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 4px;
+  transition: opacity 300ms var(--ease);
+}
+.mute.muted { color: var(--sub); }
+
+/* iOS 세그먼트 컨트롤 */
+.segmented {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding: 4px;
+  background: var(--surface-2);
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 0.5px var(--hairline);
+}
+.seg-indicator {
+  position: absolute;
+  top: 4px; left: 4px;
+  width: calc((100% - 8px) / 4);
+  height: calc(100% - 8px);
+  background: var(--bg);
+  border-radius: 11px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.04);
+  transition: transform 380ms var(--ease);
+  z-index: 0;
+}
+[data-theme="dark"] .seg-indicator { background: #48484a; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+.seg {
+  position: relative;
+  z-index: 1;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--sub);
+  min-height: 48px;
+  cursor: pointer;
+  transition: color 300ms var(--ease), font-weight 300ms var(--ease);
+}
+.seg.active { color: var(--text); font-weight: 600; }
+.seg:not(.active):active { color: var(--text); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+  .eyebrow, h1.title, .subtitle, .cta-zone, .dock { opacity: 1 !important; transform: none !important; }
+  #app.calm .breath-ring { animation: none; transform: scale(1); }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- 상단 -->
+  <div class="topbar">
+    <div class="wordmark">평온<span>.</span></div>
+    <button class="icon-btn" id="theme-btn" type="button" aria-label="라이트/다크 전환">☾</button>
+  </div>
+
+  <!-- 히어로 -->
+  <main class="hero">
+    <div class="eyebrow">마음을 위한 쉼</div>
+    <h1 class="title">평온<span class="dot">.</span></h1>
+    <p class="subtitle">버튼 하나로, 감각을<br />천천히 가라앉혀 보세요.</p>
+
+    <div class="cta-zone">
+      <div class="breath-ring" aria-hidden="true"></div>
+      <div class="timer" id="timer">0:00</div>
+      <button class="cta" id="cta" type="button">평온 시작하기</button>
+    </div>
+  </main>
+
+  <!-- 하단 사운드 -->
+  <div class="dock">
+    <div class="dock-label">
+      <span class="t">자연의 소리</span>
+      <button class="mute" id="mute" type="button">소리 끄기</button>
+    </div>
+    <div class="segmented" role="tablist" aria-label="사운드 선택">
+      <span class="seg-indicator" id="seg-indicator"></span>
+      <button class="seg active" data-sound="birds"  type="button" role="tab">새소리</button>
+      <button class="seg"        data-sound="rain"   type="button" role="tab">빗소리</button>
+      <button class="seg"        data-sound="stream" type="button" role="tab">시냇물</button>
+      <button class="seg"        data-sound="wind"   type="button" role="tab">바람</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+const state = { calm: false, sound: 'birds', muted: false, volume: 0.30, start: 0, tHandle: null };
+const app = document.getElementById('app');
+const cta = document.getElementById('cta');
+const muteBtn = document.getElementById('mute');
+const themeBtn = document.getElementById('theme-btn');
+const timerEl = document.getElementById('timer');
+const segs = document.querySelectorAll('.seg');
+const indicator = document.getElementById('seg-indicator');
+
+/* ════ 오디오 엔진 (Web Audio API · 외부 파일 0개) ════ */
+const Audio = (() => {
+  let ctx = null, master = null, cur = null;
+  const FI = 2.0, FO = 1.2;
+  function ensure() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain();
+      master.gain.value = state.muted ? 0 : state.volume;
+      master.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+  }
+  function noise() {
+    const len = ctx.sampleRate * 2, b = ctx.createBuffer(1, len, ctx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const s = ctx.createBufferSource(); s.buffer = b; s.loop = true; return s;
+  }
+  function rain(out){ const N=[],n=noise(); const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1100;lp.Q.value=0.6; const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=280; n.connect(hp).connect(lp).connect(out);n.start();N.push(n,hp,lp); const l=ctx.createOscillator(),g=ctx.createGain();l.frequency.value=0.07;g.gain.value=240;l.connect(g).connect(lp.frequency);l.start();N.push(l,g); return{N,T:[]}; }
+  function birds(out){ const N=[],T=[],n=noise(); const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=500;bp.Q.value=0.4; const bg=ctx.createGain();bg.gain.value=0.14; n.connect(bp).connect(bg).connect(out);n.start();N.push(n,bp,bg);
+    function chirp(){ if(!ctx)return; const t0=ctx.currentTime,notes=2+Math.floor(Math.random()*3),base=2100+Math.random()*1500;
+      for(let i=0;i<notes;i++){ const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine'; const st=t0+i*(0.1+Math.random()*0.07),du=0.07+Math.random()*0.08,f=base*(1+(Math.random()-0.4)*0.25);
+        o.frequency.setValueAtTime(f,st);o.frequency.exponentialRampToValueAtTime(f*(1.15+Math.random()*0.2),st+du*0.6);o.frequency.exponentialRampToValueAtTime(f*0.92,st+du);
+        g.gain.setValueAtTime(0,st);g.gain.linearRampToValueAtTime(0.16,st+0.02);g.gain.exponentialRampToValueAtTime(0.001,st+du); o.connect(g).connect(out);o.start(st);o.stop(st+du+0.05); }
+      T.push(setTimeout(chirp,1200+Math.random()*2800)); }
+    T.push(setTimeout(chirp,400)); return{N,T}; }
+  function stream(out){ const N=[],n=noise(); const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=850;bp.Q.value=0.9; const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=2400; n.connect(bp).connect(lp).connect(out);n.start();N.push(n,bp,lp); const a=ctx.createOscillator(),ag=ctx.createGain();a.frequency.value=0.5;ag.gain.value=180;a.connect(ag).connect(bp.frequency);a.start(); const b=ctx.createOscillator(),bg=ctx.createGain();b.frequency.value=1.7;bg.gain.value=90;b.connect(bg).connect(bp.frequency);b.start(); N.push(a,ag,b,bg); return{N,T:[]}; }
+  function wind(out){ const N=[],n=noise(); const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=420;bp.Q.value=0.5; const sw=ctx.createGain();sw.gain.value=0.7; n.connect(bp).connect(sw).connect(out);n.start();N.push(n,bp,sw); const l=ctx.createOscillator(),g=ctx.createGain();l.frequency.value=0.08;g.gain.value=0.32;l.connect(g).connect(sw.gain);l.start(); const lf=ctx.createOscillator(),gf=ctx.createGain();lf.frequency.value=0.05;gf.gain.value=160;lf.connect(gf).connect(bp.frequency);lf.start(); N.push(l,g,lf,gf); return{N,T:[]}; }
+  const B = { rain, birds, stream, wind }, L = { rain:0.5, birds:0.55, stream:0.42, wind:0.5 };
+  function play(name){ ensure(); stop(); const g=ctx.createGain(); g.gain.setValueAtTime(0,ctx.currentTime); g.gain.linearRampToValueAtTime(L[name],ctx.currentTime+FI); g.connect(master); const r=B[name](g); cur={g,N:r.N,T:r.T}; }
+  function stop(){ if(!cur||!ctx)return; const{g,N,T}=cur; cur=null; T.forEach(clearTimeout); const now=ctx.currentTime; g.gain.cancelScheduledValues(now); g.gain.setValueAtTime(g.gain.value,now); g.gain.linearRampToValueAtTime(0,now+FO); setTimeout(()=>{ N.forEach(nd=>{try{if(nd.stop)nd.stop();}catch(e){}try{nd.disconnect();}catch(e){}}); try{g.disconnect();}catch(e){} },(FO+0.1)*1000); }
+  function ramp(v){ if(!ctx)return; const now=ctx.currentTime; master.gain.cancelScheduledValues(now); master.gain.setValueAtTime(master.gain.value,now); master.gain.linearRampToValueAtTime(v,now+0.4); }
+  function setMuted(m){ ramp(m?0:state.volume); }
+  return { play, stop, setMuted };
+})();
+
+/* ════ 타이머 ════ */
+function startTimer(){ state.start=Date.now(); tick(); state.tHandle=setInterval(tick,1000); }
+function stopTimer(){ clearInterval(state.tHandle); state.tHandle=null; }
+function tick(){ const s=Math.floor((Date.now()-state.start)/1000); timerEl.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+/* ════ 세그먼트 인디케이터 ════ */
+function moveIndicator(idx){ indicator.style.transform = `translateX(${idx * 100}%)`; }
+
+/* ════ 인터랙션 ════ */
+cta.addEventListener('click', () => {
+  state.calm = !state.calm;
+  if (state.calm) {
+    app.classList.add('calm');
+    cta.textContent = '평온 끝내기';
+    Audio.play(state.sound);
+    startTimer();
+    dark = true; applyTheme(true);     // 평온 시작 → 밤
+  } else {
+    app.classList.remove('calm');
+    cta.textContent = '평온 시작하기';
+    Audio.stop();
+    stopTimer();
+    dark = false; applyTheme(false);    // 평온 끝 → 낮
+  }
+});
+
+segs.forEach((s, i) => s.addEventListener('click', () => {
+  state.sound = s.dataset.sound;
+  segs.forEach(b => b.classList.toggle('active', b === s));
+  moveIndicator(i);
+  if (state.calm) Audio.play(state.sound);
+}));
+
+muteBtn.addEventListener('click', () => {
+  state.muted = !state.muted;
+  muteBtn.textContent = state.muted ? '소리 켜기' : '소리 끄기';
+  muteBtn.classList.toggle('muted', state.muted);
+  Audio.setMuted(state.muted);
+});
+
+/* ════ 테마 ════ */
+function applyTheme(dark){ document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light'); themeBtn.textContent = dark ? '☀' : '☾'; }
+let dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+applyTheme(dark);
+themeBtn.addEventListener('click', () => { dark = !dark; applyTheme(dark); });
+
+function syncIndicator() {
+  const idx = [...segs].findIndex(s => s.classList.contains('active'));
+  moveIndicator(idx < 0 ? 0 : idx);
+}
+window.addEventListener('resize', syncIndicator);
+
+/* ════ 초기화 ════ */
+syncIndicator();
+</script>
+</body>
+</html>
