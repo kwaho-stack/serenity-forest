@@ -23,8 +23,8 @@
   · 일러스트 전면 제거, 여백·타이포·버튼만으로 구성
   · 시스템 폰트 느낌(Pretendard), iOS 세그먼트 컨트롤, 알약 CTA
   · 라이트/다크 자동 + 토글 (HSP 야간 사용 배려)
-  · 기능: Web Audio 합성 사운드 8카테고리×4종(외부 파일 0), 호흡 가이드, 타이머
-  · 시작 버튼 문구 랜덤(50% '평온해지기'), 사운드 카테고리 시트
+  · 기능: Web Audio 합성 사운드 3그룹·8카테고리×4종(외부 파일 0), 호흡 가이드, 타이머
+  · 시작 버튼 문구 랜덤(50% '평온해지기', 외 연속금지), 그룹형 카테고리 시트
   ⚠ AudioContext 생성/resume은 버튼 탭 핸들러 안에서만 (자동재생 정책)
 ═══════════════════════════════════════════════════════════════════
 -->
@@ -320,7 +320,13 @@ h1.title .dot { color: var(--accent); }
 .cat-sheet.show { transform: translate(-50%, 0); }
 .cat-grip { width: 38px; height: 5px; border-radius: 3px; background: var(--surface); margin: 8px auto 6px; }
 .cat-head { font-size: 13px; font-weight: 700; color: var(--sub); text-align: center; padding: 4px 0 8px; letter-spacing: 0.02em; }
-.cat-list { list-style: none; max-height: 60vh; overflow-y: auto; }
+.cat-list { list-style: none; max-height: 62vh; overflow-y: auto; }
+.cat-group {
+  padding: 16px 14px 6px;
+  font-size: 12px; font-weight: 700;
+  color: var(--sub); letter-spacing: 0.06em;
+}
+.cat-group:first-child { padding-top: 6px; }
 .cat-row {
   display: flex; align-items: center; justify-content: space-between;
   padding: 15px 14px; border-radius: 12px;
@@ -400,55 +406,58 @@ const scrim = document.getElementById('scrim');
 const catSheet = document.getElementById('cat-sheet');
 const catList = document.getElementById('cat-list');
 
-/* ════ 카테고리 × 사운드 정의 (각 사운드는 합성 스펙) ════ */
+/* ════ 카테고리 × 사운드 정의 (group: 일상 / 깊은 평온 / 발견) ════ */
 const CATEGORIES = [
-  { name:'자연의 소리', sounds:[
+  // ── 일상 ──
+  { name:'자연의 소리', group:'일상', sounds:[
     { label:'새소리', level:0.9,  layers:[ {t:'noise', bp:500,q:0.4, level:0.12}, {t:'chirp', loFreq:2100,hiFreq:3600, notesLo:2,notesHi:4, gapLo:1.2,gapHi:3.4, level:0.16} ] },
     { label:'빗소리', level:0.9,  layers:[ {t:'noise', hp:280, lp:1100, lpq:0.6, lfo:0.07, lfoDepth:240, level:0.55} ] },
     { label:'시냇물', level:0.9,  layers:[ {t:'noise', bp:850,q:0.9, lfo:0.6, lfoDepth:180, level:0.45}, {t:'noise', lp:2400, level:0.16} ] },
     { label:'바람',   level:0.9,  layers:[ {t:'noise', bp:420,q:0.5, swell:0.06, swellDepth:0.3, lfo:0.05, lfoDepth:160, level:0.6} ] },
   ]},
-  { name:'새벽 안갯속의 숲', sounds:[
-    { label:'옅은 안개', level:0.9, layers:[ {t:'noise', lp:600,lpq:0.5, swell:0.04, swellDepth:0.2, level:0.45} ] },
-    { label:'멀리 새',   level:0.9, layers:[ {t:'noise', lp:800, level:0.1}, {t:'chirp', loFreq:1500,hiFreq:2300, notesLo:1,notesHi:2, gapLo:2.5,gapHi:6, level:0.09} ] },
-    { label:'풀잎 이슬', level:0.9, layers:[ {t:'noise', lp:500, level:0.08}, {t:'chirp', loFreq:2600,hiFreq:3400, notesLo:1,notesHi:1, dur:0.09, gapLo:0.8,gapHi:2.2, level:0.08, down:true} ] },
-    { label:'산들바람',  level:0.9, layers:[ {t:'noise', bp:380,q:0.6, swell:0.05, swellDepth:0.3, level:0.5} ] },
-  ]},
-  { name:'구름 위로 흐르는 물', sounds:[
+  { name:'구름 위로 흐르는', group:'일상', sounds:[
     { label:'물 흐름',   level:0.9, layers:[ {t:'noise', bp:900,q:0.8, lfo:0.4, lfoDepth:160, level:0.45} ] },
     { label:'물방울',    level:0.9, layers:[ {t:'noise', lp:700, level:0.08}, {t:'chirp', loFreq:900,hiFreq:1500, notesLo:1,notesHi:1, dur:0.13, gapLo:0.5,gapHi:1.6, level:0.13, down:true} ] },
     { label:'잔물결',    level:0.9, layers:[ {t:'noise', bp:1300,q:1.2, lfo:0.9, lfoDepth:200, level:0.35} ] },
     { label:'폭포 멀리', level:0.9, layers:[ {t:'noise', hp:200, lp:1500, level:0.55} ] },
   ]},
-  { name:'우주 정원의 공명', sounds:[
-    { label:'공명',      level:0.95, layers:[ {t:'drone', freqs:[110,165,220], lfo:0.06, lfoDepth:0.06, level:0.34} ] },
-    { label:'별빛',      level:0.95, layers:[ {t:'drone', freqs:[220], level:0.12}, {t:'chirp', loFreq:2400,hiFreq:3800, notesLo:1,notesHi:1, dur:0.2, gapLo:0.6,gapHi:1.8, level:0.07, down:true} ] },
-    { label:'성운',      level:0.95, layers:[ {t:'drone', freqs:[82,123,164], osc:'triangle', lfo:0.04, lfoDepth:0.08, level:0.3} ] },
-    { label:'위성 신호', level:0.95, layers:[ {t:'drone', freqs:[60], level:0.18}, {t:'pulse', osc:'sine', freq:880, dur:0.14, intervalLo:1.5,intervalHi:3.5, level:0.1} ] },
+  { name:'네온사인, 도시', group:'일상', sounds:[
+    { label:'빗속 도시',  level:0.9,  layers:[ {t:'noise', hp:300, lp:1000, lfo:0.07, lfoDepth:200, level:0.42}, {t:'drone', freqs:[70], level:0.08} ] },
+    { label:'먼 차 소리', level:0.9,  layers:[ {t:'noise', lp:500, swell:0.06, swellDepth:0.3, level:0.45} ] },
+    { label:'네온 허밍',  level:0.92, layers:[ {t:'drone', freqs:[120,180], osc:'triangle', lfo:0.5, lfoDepth:0.05, level:0.16} ] },
+    { label:'창밖 비',    level:0.9,  layers:[ {t:'noise', hp:500, lp:2500, lfo:0.1, lfoDepth:300, level:0.42} ] },
   ]},
-  { name:'달빛 어린 밤하늘', sounds:[
+  // ── 깊은 평온 ──
+  { name:'푸른 숲과 안개', group:'깊은 평온', sounds:[
+    { label:'옅은 안개', level:0.9, layers:[ {t:'noise', lp:600,lpq:0.5, swell:0.04, swellDepth:0.2, level:0.45} ] },
+    { label:'멀리 새',   level:0.9, layers:[ {t:'noise', lp:800, level:0.1}, {t:'chirp', loFreq:1500,hiFreq:2300, notesLo:1,notesHi:2, gapLo:2.5,gapHi:6, level:0.09} ] },
+    { label:'풀잎 이슬', level:0.9, layers:[ {t:'noise', lp:500, level:0.08}, {t:'chirp', loFreq:2600,hiFreq:3400, notesLo:1,notesHi:1, dur:0.09, gapLo:0.8,gapHi:2.2, level:0.08, down:true} ] },
+    { label:'산들바람',  level:0.9, layers:[ {t:'noise', bp:380,q:0.6, swell:0.05, swellDepth:0.3, level:0.5} ] },
+  ]},
+  { name:'달빛 어린 밤하늘', group:'깊은 평온', sounds:[
     { label:'밤바람',    level:0.9,  layers:[ {t:'noise', bp:340,q:0.5, swell:0.05, swellDepth:0.28, level:0.5} ] },
     { label:'풀벌레',    level:0.9,  layers:[ {t:'chirp', loFreq:3600,hiFreq:4600, notesLo:4,notesHi:8, spacingLo:0.05,spacingHi:0.09, dur:0.04, gapLo:0.3,gapHi:0.9, level:0.05} ] },
     { label:'부엉이',    level:0.9,  layers:[ {t:'drone', freqs:[55], level:0.1}, {t:'pulse', osc:'sine', freq:330, glide:280, dur:0.4, attack:0.06, intervalLo:3,intervalHi:6, level:0.13} ] },
     { label:'별의 노래', level:0.95, layers:[ {t:'drone', freqs:[196,294], lfo:0.05, lfoDepth:0.07, level:0.26} ] },
   ]},
-  { name:'심해의 침묵', sounds:[
+  { name:'심해의 고요', group:'깊은 평온', sounds:[
     { label:'수압',      level:0.95, layers:[ {t:'drone', freqs:[45,67], lfo:0.03, lfoDepth:0.05, level:0.34}, {t:'noise', lp:200, level:0.22} ] },
     { label:'고래 노래', level:0.95, layers:[ {t:'drone', freqs:[60], level:0.12}, {t:'pulse', osc:'sine', freq:180, glide:120, dur:1.2, attack:0.3, intervalLo:4,intervalHi:8, level:0.14} ] },
     { label:'해류',      level:0.9,  layers:[ {t:'noise', lp:400, swell:0.04, swellDepth:0.3, level:0.45} ] },
     { label:'물거품',    level:0.9,  layers:[ {t:'noise', lp:300, level:0.14}, {t:'chirp', loFreq:400,hiFreq:800, notesLo:1,notesHi:2, dur:0.1, gapLo:0.4,gapHi:1.2, level:0.09, down:true} ] },
   ]},
-  { name:'잠과 꿈의 경계', sounds:[
+  { name:'달콤한 꿈 사이', group:'깊은 평온', sounds:[
     { label:'백색소음', level:0.85, layers:[ {t:'noise', lp:9000, level:0.4} ] },
     { label:'분홍소음', level:0.9,  layers:[ {t:'noise', lp:1500, lpq:0.4, level:0.5} ] },
     { label:'자장가',   level:0.95, layers:[ {t:'drone', freqs:[262,330,392], lfo:0.08, lfoDepth:0.1, level:0.24} ] },
     { label:'심장박동', level:0.95, layers:[ {t:'pulse', osc:'sine', freq:65, glide:42, dur:0.22, attack:0.01, interval:0.92, level:0.55} ] },
   ]},
-  { name:'흐려진 도시의 밤', sounds:[
-    { label:'빗속 도시',  level:0.9,  layers:[ {t:'noise', hp:300, lp:1000, lfo:0.07, lfoDepth:200, level:0.42}, {t:'drone', freqs:[70], level:0.08} ] },
-    { label:'먼 차 소리', level:0.9,  layers:[ {t:'noise', lp:500, swell:0.06, swellDepth:0.3, level:0.45} ] },
-    { label:'네온 허밍',  level:0.92, layers:[ {t:'drone', freqs:[120,180], osc:'triangle', lfo:0.5, lfoDepth:0.05, level:0.16} ] },
-    { label:'창밖 비',    level:0.9,  layers:[ {t:'noise', hp:500, lp:2500, lfo:0.1, lfoDepth:300, level:0.42} ] },
+  // ── 발견 ──
+  { name:'우주 정원의 공명', group:'발견', sounds:[
+    { label:'공명',      level:0.95, layers:[ {t:'drone', freqs:[110,165,220], lfo:0.06, lfoDepth:0.06, level:0.34} ] },
+    { label:'별빛',      level:0.95, layers:[ {t:'drone', freqs:[220], level:0.12}, {t:'chirp', loFreq:2400,hiFreq:3800, notesLo:1,notesHi:1, dur:0.2, gapLo:0.6,gapHi:1.8, level:0.07, down:true} ] },
+    { label:'성운',      level:0.95, layers:[ {t:'drone', freqs:[82,123,164], osc:'triangle', lfo:0.04, lfoDepth:0.08, level:0.3} ] },
+    { label:'위성 신호', level:0.95, layers:[ {t:'drone', freqs:[60], level:0.18}, {t:'pulse', osc:'sine', freq:880, dur:0.14, intervalLo:1.5,intervalHi:3.5, level:0.1} ] },
   ]},
 ];
 const curSpec = () => CATEGORIES[state.cat].sounds[state.sound];
@@ -547,9 +556,16 @@ function startTimer(){ state.start=Date.now(); tick(); state.tHandle=setInterval
 function stopTimer(){ clearInterval(state.tHandle); state.tHandle=null; }
 function tick(){ const s=Math.floor((Date.now()-state.start)/1000); timerEl.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 
-/* ════ 시작 버튼 문구 (50% '평온해지기' / 나머지 균등) ════ */
-const PHRASES = ['숨 고르기','마음 가라앉히기','생각 비우기','긴장 풀기','평온 찾기','잠시 쉬어가기','마음의 쉼표','나에게 집중하기','평온과 마주하기','고요히','비움','리셋','고요하게','지금, 평온하게','마음 다독이기'];
-function pickPhrase(){ return Math.random() < 0.5 ? '평온해지기' : PHRASES[Math.floor(Math.random() * PHRASES.length)]; }
+/* ════ 시작 버튼 문구 (50% '평온해지기' / 나머지 균등, 평온해지기 외 연속 금지) ════ */
+const PHRASES = ['숨 고르기','가라앉히기','비우기','긴장 풀기','평온 찾기','쉬어가기','쉼표','집중하기','마주하기','고요히','비움','지금, 평온하게','다독이기','위로하기','넓히기'];
+let lastPhrase = null;
+function pickPhrase(){
+  let p;
+  do { p = Math.random() < 0.5 ? '평온해지기' : PHRASES[Math.floor(Math.random() * PHRASES.length)]; }
+  while (p !== '평온해지기' && p === lastPhrase);   // 평온해지기 외에는 연속 금지
+  lastPhrase = p;
+  return p;
+}
 
 /* ════ 테마 (밝을때 해 ☀ / 어두울때 달 ☾) ════ */
 function applyTheme(d){ document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light'); themeBtn.textContent = d ? '☾' : '☀'; }
@@ -579,7 +595,15 @@ function renderSegs(){
 /* ════ 카테고리 시트 ════ */
 function renderCatList(){
   catList.innerHTML = '';
+  let lastGroup = null;
   CATEGORIES.forEach((c, i) => {
+    if (c.group !== lastGroup) {
+      const h = document.createElement('li');
+      h.className = 'cat-group';
+      h.textContent = c.group;
+      catList.appendChild(h);
+      lastGroup = c.group;
+    }
     const li = document.createElement('li');
     li.className = 'cat-row' + (i === state.cat ? ' sel' : '');
     li.innerHTML = '<span>' + c.name + '</span><span class="ck">✓</span>';
@@ -593,28 +617,29 @@ function setCategory(i){
   state.cat = i; state.sound = 0;
   catNameEl.textContent = CATEGORIES[i].name;
   renderSegs();
-  if (state.calm) Audio.play(curSpec());
+  if (state.calm) stopCalm();   // 실행 중 카테고리 변경 → 돌아가기
 }
 changeBtn.addEventListener('click', openSheet);
 scrim.addEventListener('click', closeSheet);
 
-/* ════ 평온 시작/끝내기 ════ */
-cta.addEventListener('click', () => {
-  state.calm = !state.calm;
-  if (state.calm) {
-    app.classList.add('calm');
-    cta.textContent = '평온 끝내기';
-    Audio.play(curSpec());
-    startTimer();
-    dark = true; applyTheme(true);      // 평온 시작 → 밤
-  } else {
-    app.classList.remove('calm');
-    cta.textContent = pickPhrase();     // 끝낼 때 다음 문구를 새로 뽑음
-    Audio.stop();
-    stopTimer();
-    dark = false; applyTheme(false);    // 평온 끝 → 낮
-  }
-});
+/* ════ 평온 시작 / 돌아가기 ════ */
+function startCalm(){
+  state.calm = true;
+  app.classList.add('calm');
+  cta.textContent = '돌아가기';
+  Audio.play(curSpec());
+  startTimer();
+  dark = true; applyTheme(true);      // 평온 시작 → 밤
+}
+function stopCalm(){
+  state.calm = false;
+  app.classList.remove('calm');
+  cta.textContent = pickPhrase();     // 돌아갈 때 다음 문구를 새로 뽑음
+  Audio.stop();
+  stopTimer();
+  dark = false; applyTheme(false);    // 돌아가기 → 낮
+}
+cta.addEventListener('click', () => { state.calm ? stopCalm() : startCalm(); });
 
 window.addEventListener('resize', () => moveIndicator(state.sound));
 
