@@ -23,7 +23,8 @@
   · 일러스트 전면 제거, 여백·타이포·버튼만으로 구성
   · 시스템 폰트 느낌(Pretendard), iOS 세그먼트 컨트롤, 알약 CTA
   · 라이트/다크 자동 + 토글 (HSP 야간 사용 배려)
-  · 기능: Web Audio 합성 사운드 4종(외부 파일 0), 호흡 가이드, 타이머
+  · 기능: Web Audio 합성 사운드 8카테고리×4종(외부 파일 0), 호흡 가이드, 타이머
+  · 시작 버튼 문구 랜덤(50% '평온해지기'), 사운드 카테고리 시트
   ⚠ AudioContext 생성/resume은 버튼 탭 핸들러 안에서만 (자동재생 정책)
 ═══════════════════════════════════════════════════════════════════
 -->
@@ -91,8 +92,8 @@ body {
 .wordmark span { color: var(--accent); }
 .icon-btn {
   width: 44px; height: 44px;
-  margin-right: -10px;
-  border: none; background: transparent;
+  border: none;
+  background: var(--surface);          /* 회색 원형 배경 기본 표시 */
   color: var(--text);
   font-size: 18px;
   border-radius: 50%;
@@ -100,7 +101,6 @@ body {
   display: grid; place-items: center;
   transition: background 300ms var(--ease), transform 200ms var(--ease);
 }
-.icon-btn:hover { background: var(--surface); }
 .icon-btn:active { transform: scale(0.9); }
 
 /* ── 히어로 ── */
@@ -190,6 +190,7 @@ h1.title .dot { color: var(--accent); }
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.01em;
+  white-space: nowrap;
   cursor: pointer;
   box-shadow: var(--shadow);
   transition: background 300ms var(--ease), transform 200ms var(--ease), box-shadow 300ms var(--ease);
@@ -242,7 +243,7 @@ h1.title .dot { color: var(--accent); }
   color: var(--sub);
   letter-spacing: 0.01em;
 }
-.mute {
+.change-btn {
   border: none;
   background: transparent;
   color: var(--accent);
@@ -251,9 +252,13 @@ h1.title .dot { color: var(--accent); }
   font-weight: 600;
   cursor: pointer;
   padding: 6px 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   transition: opacity 300ms var(--ease);
 }
-.mute.muted { color: var(--sub); }
+.change-btn:active { opacity: 0.6; }
+.change-btn .chev { font-size: 10px; opacity: 0.85; }
 
 /* iOS 세그먼트 컨트롤 */
 .segmented {
@@ -294,6 +299,40 @@ h1.title .dot { color: var(--accent); }
 .seg.active { color: var(--text); font-weight: 600; }
 .seg:not(.active):active { color: var(--text); }
 
+/* ── 카테고리 시트 ── */
+.scrim {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(0,0,0,0.42);
+  opacity: 0; visibility: hidden;
+  transition: opacity 320ms var(--ease), visibility 320ms var(--ease);
+}
+.scrim.show { opacity: 1; visibility: visible; }
+.cat-sheet {
+  position: fixed; left: 50%; bottom: 0; z-index: 41;
+  width: 100%; max-width: 480px;
+  transform: translate(-50%, 100%);
+  background: var(--bg);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.28);
+  padding: 8px 12px max(20px, env(safe-area-inset-bottom));
+  transition: transform 440ms var(--ease);
+}
+.cat-sheet.show { transform: translate(-50%, 0); }
+.cat-grip { width: 38px; height: 5px; border-radius: 3px; background: var(--surface); margin: 8px auto 6px; }
+.cat-head { font-size: 13px; font-weight: 700; color: var(--sub); text-align: center; padding: 4px 0 8px; letter-spacing: 0.02em; }
+.cat-list { list-style: none; max-height: 60vh; overflow-y: auto; }
+.cat-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 15px 14px; border-radius: 12px;
+  font-size: 16px; font-weight: 500; color: var(--text);
+  cursor: pointer;
+  transition: background 200ms var(--ease);
+}
+.cat-row:active { background: var(--surface); }
+.cat-row.sel { color: var(--accent); font-weight: 700; }
+.cat-row .ck { color: var(--accent); opacity: 0; font-size: 15px; }
+.cat-row.sel .ck { opacity: 1; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
   .eyebrow, h1.title, .subtitle, .cta-zone, .dock { opacity: 1 !important; transform: none !important; }
@@ -327,31 +366,92 @@ h1.title .dot { color: var(--accent); }
   <!-- 하단 사운드 -->
   <div class="dock">
     <div class="dock-label">
-      <span class="t">자연의 소리</span>
-      <button class="mute" id="mute" type="button">소리 끄기</button>
+      <span class="t" id="cat-name">자연의 소리</span>
+      <button class="change-btn" id="change" type="button">소리 바꾸기 <span class="chev">▾</span></button>
     </div>
-    <div class="segmented" role="tablist" aria-label="사운드 선택">
+    <div class="segmented" id="segmented" role="tablist" aria-label="사운드 선택">
       <span class="seg-indicator" id="seg-indicator"></span>
-      <button class="seg active" data-sound="birds"  type="button" role="tab">새소리</button>
-      <button class="seg"        data-sound="rain"   type="button" role="tab">빗소리</button>
-      <button class="seg"        data-sound="stream" type="button" role="tab">시냇물</button>
-      <button class="seg"        data-sound="wind"   type="button" role="tab">바람</button>
     </div>
   </div>
 
 </div>
 
+<!-- 사운드 카테고리 시트 -->
+<div class="scrim" id="scrim"></div>
+<aside class="cat-sheet" id="cat-sheet" role="dialog" aria-label="사운드 카테고리">
+  <div class="cat-grip"></div>
+  <div class="cat-head">사운드 카테고리</div>
+  <ul class="cat-list" id="cat-list"></ul>
+</aside>
+
 <script>
 'use strict';
 
-const state = { calm: false, sound: 'birds', muted: false, volume: 0.30, start: 0, tHandle: null };
+const state = { calm: false, cat: 0, sound: 0, start: 0, tHandle: null, volume: 0.30 };
 const app = document.getElementById('app');
 const cta = document.getElementById('cta');
-const muteBtn = document.getElementById('mute');
 const themeBtn = document.getElementById('theme-btn');
 const timerEl = document.getElementById('timer');
-const segs = document.querySelectorAll('.seg');
+const segmented = document.getElementById('segmented');
 const indicator = document.getElementById('seg-indicator');
+const changeBtn = document.getElementById('change');
+const catNameEl = document.getElementById('cat-name');
+const scrim = document.getElementById('scrim');
+const catSheet = document.getElementById('cat-sheet');
+const catList = document.getElementById('cat-list');
+
+/* ════ 카테고리 × 사운드 정의 (각 사운드는 합성 스펙) ════ */
+const CATEGORIES = [
+  { name:'자연의 소리', sounds:[
+    { label:'새소리', level:0.9,  layers:[ {t:'noise', bp:500,q:0.4, level:0.12}, {t:'chirp', loFreq:2100,hiFreq:3600, notesLo:2,notesHi:4, gapLo:1.2,gapHi:3.4, level:0.16} ] },
+    { label:'빗소리', level:0.9,  layers:[ {t:'noise', hp:280, lp:1100, lpq:0.6, lfo:0.07, lfoDepth:240, level:0.55} ] },
+    { label:'시냇물', level:0.9,  layers:[ {t:'noise', bp:850,q:0.9, lfo:0.6, lfoDepth:180, level:0.45}, {t:'noise', lp:2400, level:0.16} ] },
+    { label:'바람',   level:0.9,  layers:[ {t:'noise', bp:420,q:0.5, swell:0.06, swellDepth:0.3, lfo:0.05, lfoDepth:160, level:0.6} ] },
+  ]},
+  { name:'새벽 안갯속의 숲', sounds:[
+    { label:'옅은 안개', level:0.9, layers:[ {t:'noise', lp:600,lpq:0.5, swell:0.04, swellDepth:0.2, level:0.45} ] },
+    { label:'멀리 새',   level:0.9, layers:[ {t:'noise', lp:800, level:0.1}, {t:'chirp', loFreq:1500,hiFreq:2300, notesLo:1,notesHi:2, gapLo:2.5,gapHi:6, level:0.09} ] },
+    { label:'풀잎 이슬', level:0.9, layers:[ {t:'noise', lp:500, level:0.08}, {t:'chirp', loFreq:2600,hiFreq:3400, notesLo:1,notesHi:1, dur:0.09, gapLo:0.8,gapHi:2.2, level:0.08, down:true} ] },
+    { label:'산들바람',  level:0.9, layers:[ {t:'noise', bp:380,q:0.6, swell:0.05, swellDepth:0.3, level:0.5} ] },
+  ]},
+  { name:'구름 위로 흐르는 물', sounds:[
+    { label:'물 흐름',   level:0.9, layers:[ {t:'noise', bp:900,q:0.8, lfo:0.4, lfoDepth:160, level:0.45} ] },
+    { label:'물방울',    level:0.9, layers:[ {t:'noise', lp:700, level:0.08}, {t:'chirp', loFreq:900,hiFreq:1500, notesLo:1,notesHi:1, dur:0.13, gapLo:0.5,gapHi:1.6, level:0.13, down:true} ] },
+    { label:'잔물결',    level:0.9, layers:[ {t:'noise', bp:1300,q:1.2, lfo:0.9, lfoDepth:200, level:0.35} ] },
+    { label:'폭포 멀리', level:0.9, layers:[ {t:'noise', hp:200, lp:1500, level:0.55} ] },
+  ]},
+  { name:'우주 정원의 공명', sounds:[
+    { label:'공명',      level:0.95, layers:[ {t:'drone', freqs:[110,165,220], lfo:0.06, lfoDepth:0.06, level:0.34} ] },
+    { label:'별빛',      level:0.95, layers:[ {t:'drone', freqs:[220], level:0.12}, {t:'chirp', loFreq:2400,hiFreq:3800, notesLo:1,notesHi:1, dur:0.2, gapLo:0.6,gapHi:1.8, level:0.07, down:true} ] },
+    { label:'성운',      level:0.95, layers:[ {t:'drone', freqs:[82,123,164], osc:'triangle', lfo:0.04, lfoDepth:0.08, level:0.3} ] },
+    { label:'위성 신호', level:0.95, layers:[ {t:'drone', freqs:[60], level:0.18}, {t:'pulse', osc:'sine', freq:880, dur:0.14, intervalLo:1.5,intervalHi:3.5, level:0.1} ] },
+  ]},
+  { name:'달빛 어린 밤하늘', sounds:[
+    { label:'밤바람',    level:0.9,  layers:[ {t:'noise', bp:340,q:0.5, swell:0.05, swellDepth:0.28, level:0.5} ] },
+    { label:'풀벌레',    level:0.9,  layers:[ {t:'chirp', loFreq:3600,hiFreq:4600, notesLo:4,notesHi:8, spacingLo:0.05,spacingHi:0.09, dur:0.04, gapLo:0.3,gapHi:0.9, level:0.05} ] },
+    { label:'부엉이',    level:0.9,  layers:[ {t:'drone', freqs:[55], level:0.1}, {t:'pulse', osc:'sine', freq:330, glide:280, dur:0.4, attack:0.06, intervalLo:3,intervalHi:6, level:0.13} ] },
+    { label:'별의 노래', level:0.95, layers:[ {t:'drone', freqs:[196,294], lfo:0.05, lfoDepth:0.07, level:0.26} ] },
+  ]},
+  { name:'심해의 침묵', sounds:[
+    { label:'수압',      level:0.95, layers:[ {t:'drone', freqs:[45,67], lfo:0.03, lfoDepth:0.05, level:0.34}, {t:'noise', lp:200, level:0.22} ] },
+    { label:'고래 노래', level:0.95, layers:[ {t:'drone', freqs:[60], level:0.12}, {t:'pulse', osc:'sine', freq:180, glide:120, dur:1.2, attack:0.3, intervalLo:4,intervalHi:8, level:0.14} ] },
+    { label:'해류',      level:0.9,  layers:[ {t:'noise', lp:400, swell:0.04, swellDepth:0.3, level:0.45} ] },
+    { label:'물거품',    level:0.9,  layers:[ {t:'noise', lp:300, level:0.14}, {t:'chirp', loFreq:400,hiFreq:800, notesLo:1,notesHi:2, dur:0.1, gapLo:0.4,gapHi:1.2, level:0.09, down:true} ] },
+  ]},
+  { name:'잠과 꿈의 경계', sounds:[
+    { label:'백색소음', level:0.85, layers:[ {t:'noise', lp:9000, level:0.4} ] },
+    { label:'분홍소음', level:0.9,  layers:[ {t:'noise', lp:1500, lpq:0.4, level:0.5} ] },
+    { label:'자장가',   level:0.95, layers:[ {t:'drone', freqs:[262,330,392], lfo:0.08, lfoDepth:0.1, level:0.24} ] },
+    { label:'심장박동', level:0.95, layers:[ {t:'pulse', osc:'sine', freq:65, glide:42, dur:0.22, attack:0.01, interval:0.92, level:0.55} ] },
+  ]},
+  { name:'흐려진 도시의 밤', sounds:[
+    { label:'빗속 도시',  level:0.9,  layers:[ {t:'noise', hp:300, lp:1000, lfo:0.07, lfoDepth:200, level:0.42}, {t:'drone', freqs:[70], level:0.08} ] },
+    { label:'먼 차 소리', level:0.9,  layers:[ {t:'noise', lp:500, swell:0.06, swellDepth:0.3, level:0.45} ] },
+    { label:'네온 허밍',  level:0.92, layers:[ {t:'drone', freqs:[120,180], osc:'triangle', lfo:0.5, lfoDepth:0.05, level:0.16} ] },
+    { label:'창밖 비',    level:0.9,  layers:[ {t:'noise', hp:500, lp:2500, lfo:0.1, lfoDepth:300, level:0.42} ] },
+  ]},
+];
+const curSpec = () => CATEGORIES[state.cat].sounds[state.sound];
 
 /* ════ 오디오 엔진 (Web Audio API · 외부 파일 0개) ════ */
 const Audio = (() => {
@@ -361,7 +461,7 @@ const Audio = (() => {
     if (!ctx) {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
       master = ctx.createGain();
-      master.gain.value = state.muted ? 0 : state.volume;
+      master.gain.value = state.volume;
       master.connect(ctx.destination);
     }
     if (ctx.state === 'suspended') ctx.resume();
@@ -371,22 +471,75 @@ const Audio = (() => {
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     const s = ctx.createBufferSource(); s.buffer = b; s.loop = true; return s;
   }
-  function rain(out){ const N=[],n=noise(); const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=1100;lp.Q.value=0.6; const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=280; n.connect(hp).connect(lp).connect(out);n.start();N.push(n,hp,lp); const l=ctx.createOscillator(),g=ctx.createGain();l.frequency.value=0.07;g.gain.value=240;l.connect(g).connect(lp.frequency);l.start();N.push(l,g); return{N,T:[]}; }
-  function birds(out){ const N=[],T=[],n=noise(); const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=500;bp.Q.value=0.4; const bg=ctx.createGain();bg.gain.value=0.14; n.connect(bp).connect(bg).connect(out);n.start();N.push(n,bp,bg);
-    function chirp(){ if(!ctx)return; const t0=ctx.currentTime,notes=2+Math.floor(Math.random()*3),base=2100+Math.random()*1500;
-      for(let i=0;i<notes;i++){ const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine'; const st=t0+i*(0.1+Math.random()*0.07),du=0.07+Math.random()*0.08,f=base*(1+(Math.random()-0.4)*0.25);
-        o.frequency.setValueAtTime(f,st);o.frequency.exponentialRampToValueAtTime(f*(1.15+Math.random()*0.2),st+du*0.6);o.frequency.exponentialRampToValueAtTime(f*0.92,st+du);
-        g.gain.setValueAtTime(0,st);g.gain.linearRampToValueAtTime(0.16,st+0.02);g.gain.exponentialRampToValueAtTime(0.001,st+du); o.connect(g).connect(out);o.start(st);o.stop(st+du+0.05); }
-      T.push(setTimeout(chirp,1200+Math.random()*2800)); }
-    T.push(setTimeout(chirp,400)); return{N,T}; }
-  function stream(out){ const N=[],n=noise(); const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=850;bp.Q.value=0.9; const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=2400; n.connect(bp).connect(lp).connect(out);n.start();N.push(n,bp,lp); const a=ctx.createOscillator(),ag=ctx.createGain();a.frequency.value=0.5;ag.gain.value=180;a.connect(ag).connect(bp.frequency);a.start(); const b=ctx.createOscillator(),bg=ctx.createGain();b.frequency.value=1.7;bg.gain.value=90;b.connect(bg).connect(bp.frequency);b.start(); N.push(a,ag,b,bg); return{N,T:[]}; }
-  function wind(out){ const N=[],n=noise(); const bp=ctx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=420;bp.Q.value=0.5; const sw=ctx.createGain();sw.gain.value=0.7; n.connect(bp).connect(sw).connect(out);n.start();N.push(n,bp,sw); const l=ctx.createOscillator(),g=ctx.createGain();l.frequency.value=0.08;g.gain.value=0.32;l.connect(g).connect(sw.gain);l.start(); const lf=ctx.createOscillator(),gf=ctx.createGain();lf.frequency.value=0.05;gf.gain.value=160;lf.connect(gf).connect(bp.frequency);lf.start(); N.push(l,g,lf,gf); return{N,T:[]}; }
-  const B = { rain, birds, stream, wind }, L = { rain:0.5, birds:0.55, stream:0.42, wind:0.5 };
-  function play(name){ ensure(); stop(); const g=ctx.createGain(); g.gain.setValueAtTime(0,ctx.currentTime); g.gain.linearRampToValueAtTime(L[name],ctx.currentTime+FI); g.connect(master); const r=B[name](g); cur={g,N:r.N,T:r.T}; }
+  const R=(a,b)=>a+Math.random()*(b-a);
+
+  /* 노이즈 베드: hp→bp→lp 필터 체인 + LFO/스웰 (비·바람·물·안개 등) */
+  function buildNoise(out,p){
+    const N=[], n=noise(); let node=n;
+    if(p.hp){ const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=p.hp; node.connect(f); node=f; N.push(f); }
+    if(p.bp){ const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=p.bp; f.Q.value=p.q||0.7; node.connect(f); node=f; N.push(f);
+      if(p.lfo){ const lo=ctx.createOscillator(),lg=ctx.createGain(); lo.frequency.value=p.lfo; lg.gain.value=p.lfoDepth||120; lo.connect(lg).connect(f.frequency); lo.start(); N.push(lo,lg); } }
+    if(p.lp){ const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=p.lp; f.Q.value=p.lpq||0.6; node.connect(f); node=f; N.push(f);
+      if(p.lfo&&!p.bp){ const lo=ctx.createOscillator(),lg=ctx.createGain(); lo.frequency.value=p.lfo; lg.gain.value=p.lfoDepth||200; lo.connect(lg).connect(f.frequency); lo.start(); N.push(lo,lg); } }
+    const g=ctx.createGain(); g.gain.value=p.level??0.4; node.connect(g).connect(out); n.start(); N.push(n,g);
+    if(p.swell){ const lo=ctx.createOscillator(),lg=ctx.createGain(); lo.frequency.value=p.swell; lg.gain.value=p.swellDepth||0.3; lo.connect(lg).connect(g.gain); lo.start(); N.push(lo,lg); }
+    return {N, T:[]};
+  }
+  /* 드론/패드: 여러 오실레이터 합 + 느린 디튠/트레몰로 (공명·성운·자장가 등) */
+  function buildDrone(out,p){
+    const N=[], g=ctx.createGain(); g.gain.value=p.level??0.25; g.connect(out); N.push(g);
+    const fr=p.freqs||[110];
+    fr.forEach((f,i)=>{ const o=ctx.createOscillator(); o.type=p.osc||'sine'; o.frequency.value=f;
+      const og=ctx.createGain(); og.gain.value=1/fr.length; o.connect(og).connect(g); o.start(); N.push(o,og);
+      const d=ctx.createOscillator(),dg=ctx.createGain(); d.frequency.value=0.05+i*0.03; dg.gain.value=1.5; d.connect(dg).connect(o.frequency); d.start(); N.push(d,dg); });
+    if(p.lfo){ const lo=ctx.createOscillator(),lg=ctx.createGain(); lo.frequency.value=p.lfo; lg.gain.value=p.lfoDepth??0.08; lo.connect(lg).connect(g.gain); lo.start(); N.push(lo,lg); }
+    return {N, T:[]};
+  }
+  /* 지저귐/물방울/별빛: 불규칙 오실레이터 블립 */
+  function buildChirp(out,p){
+    const N=[], T=[];
+    function fire(){ if(!ctx) return; const t0=ctx.currentTime;
+      const notes=(p.notesLo||1)+Math.floor(Math.random()*(((p.notesHi||3)-(p.notesLo||1))+1));
+      const base=R(p.loFreq,p.hiFreq);
+      for(let i=0;i<notes;i++){ const o=ctx.createOscillator(),g=ctx.createGain(); o.type=p.osc||'sine';
+        const st=t0+i*(p.spacingLo!=null?R(p.spacingLo,p.spacingHi):R(0.08,0.16));
+        const du=p.dur!=null?p.dur:R(0.06,0.13);
+        const f=base*(1+(Math.random()-0.5)*(p.spread||0.2));
+        o.frequency.setValueAtTime(f,st);
+        if(p.down){ o.frequency.exponentialRampToValueAtTime(f*0.7, st+du); }
+        else { o.frequency.exponentialRampToValueAtTime(f*(1.1+Math.random()*0.2), st+du*0.6); o.frequency.exponentialRampToValueAtTime(f*0.9, st+du); }
+        const lvl=p.level||0.14;
+        g.gain.setValueAtTime(0,st); g.gain.linearRampToValueAtTime(lvl, st+0.02); g.gain.exponentialRampToValueAtTime(0.001, st+du);
+        o.connect(g).connect(out); o.start(st); o.stop(st+du+0.05);
+      }
+      T.push(setTimeout(fire, R(p.gapLo,p.gapHi)*1000));
+    }
+    T.push(setTimeout(fire, R(0.2, p.gapLo||1)*1000));
+    return {N, T};
+  }
+  /* 맥동: 심장박동·부엉이·고래·위성 신호 */
+  function buildPulse(out,p){
+    const N=[], T=[];
+    function beat(){ if(!ctx) return; const st=ctx.currentTime, du=p.dur||0.2;
+      const o=ctx.createOscillator(); o.type=p.osc||'sine'; o.frequency.setValueAtTime(p.freq||80, st);
+      if(p.glide) o.frequency.exponentialRampToValueAtTime(p.glide, st+du);
+      const g=ctx.createGain(); g.gain.setValueAtTime(0,st); g.gain.linearRampToValueAtTime(p.level||0.3, st+(p.attack||0.02)); g.gain.exponentialRampToValueAtTime(0.001, st+du);
+      o.connect(g).connect(out); o.start(st); o.stop(st+du+0.05);
+      T.push(setTimeout(beat, (p.intervalLo!=null?R(p.intervalLo,p.intervalHi):(p.interval||1))*1000));
+    }
+    T.push(setTimeout(beat, 250));
+    return {N, T};
+  }
+  const BUILD={ noise:buildNoise, drone:buildDrone, chirp:buildChirp, pulse:buildPulse };
+
+  function play(spec){ ensure(); stop();
+    const g=ctx.createGain(); g.gain.setValueAtTime(0,ctx.currentTime); g.gain.linearRampToValueAtTime(spec.level??0.9, ctx.currentTime+FI); g.connect(master);
+    let N=[], T=[];
+    (spec.layers||[]).forEach(L=>{ const r=BUILD[L.t](g,L); N=N.concat(r.N); T=T.concat(r.T); });
+    cur={g,N,T};
+  }
   function stop(){ if(!cur||!ctx)return; const{g,N,T}=cur; cur=null; T.forEach(clearTimeout); const now=ctx.currentTime; g.gain.cancelScheduledValues(now); g.gain.setValueAtTime(g.gain.value,now); g.gain.linearRampToValueAtTime(0,now+FO); setTimeout(()=>{ N.forEach(nd=>{try{if(nd.stop)nd.stop();}catch(e){}try{nd.disconnect();}catch(e){}}); try{g.disconnect();}catch(e){} },(FO+0.1)*1000); }
-  function ramp(v){ if(!ctx)return; const now=ctx.currentTime; master.gain.cancelScheduledValues(now); master.gain.setValueAtTime(master.gain.value,now); master.gain.linearRampToValueAtTime(v,now+0.4); }
-  function setMuted(m){ ramp(m?0:state.volume); }
-  return { play, stop, setMuted };
+  return { play, stop };
 })();
 
 /* ════ 타이머 ════ */
@@ -394,55 +547,81 @@ function startTimer(){ state.start=Date.now(); tick(); state.tHandle=setInterval
 function stopTimer(){ clearInterval(state.tHandle); state.tHandle=null; }
 function tick(){ const s=Math.floor((Date.now()-state.start)/1000); timerEl.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 
-/* ════ 세그먼트 인디케이터 ════ */
-function moveIndicator(idx){ indicator.style.transform = `translateX(${idx * 100}%)`; }
+/* ════ 시작 버튼 문구 (50% '평온해지기' / 나머지 균등) ════ */
+const PHRASES = ['숨 고르기','마음 가라앉히기','생각 비우기','긴장 풀기','평온 찾기','잠시 쉬어가기','마음의 쉼표','나에게 집중하기','평온과 마주하기','고요히','비움','리셋','고요하게','지금, 평온하게','마음 다독이기'];
+function pickPhrase(){ return Math.random() < 0.5 ? '평온해지기' : PHRASES[Math.floor(Math.random() * PHRASES.length)]; }
 
-/* ════ 인터랙션 ════ */
+/* ════ 테마 (밝을때 해 ☀ / 어두울때 달 ☾) ════ */
+function applyTheme(d){ document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light'); themeBtn.textContent = d ? '☾' : '☀'; }
+let dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+applyTheme(dark);
+themeBtn.addEventListener('click', () => { dark = !dark; applyTheme(dark); });
+
+/* ════ 세그먼트 (현재 카테고리의 4가지 소리) ════ */
+function moveIndicator(idx){ indicator.style.transform = `translateX(${idx * 100}%)`; }
+function renderSegs(){
+  segmented.querySelectorAll('.seg').forEach(b => b.remove());
+  CATEGORIES[state.cat].sounds.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.className = 'seg' + (i === state.sound ? ' active' : '');
+    b.type = 'button'; b.setAttribute('role', 'tab'); b.textContent = s.label;
+    b.addEventListener('click', () => {
+      state.sound = i;
+      segmented.querySelectorAll('.seg').forEach(x => x.classList.toggle('active', x === b));
+      moveIndicator(i);
+      if (state.calm) Audio.play(curSpec());
+    });
+    segmented.appendChild(b);
+  });
+  moveIndicator(state.sound);
+}
+
+/* ════ 카테고리 시트 ════ */
+function renderCatList(){
+  catList.innerHTML = '';
+  CATEGORIES.forEach((c, i) => {
+    const li = document.createElement('li');
+    li.className = 'cat-row' + (i === state.cat ? ' sel' : '');
+    li.innerHTML = '<span>' + c.name + '</span><span class="ck">✓</span>';
+    li.addEventListener('click', () => { setCategory(i); closeSheet(); });
+    catList.appendChild(li);
+  });
+}
+function openSheet(){ renderCatList(); scrim.classList.add('show'); catSheet.classList.add('show'); }
+function closeSheet(){ scrim.classList.remove('show'); catSheet.classList.remove('show'); }
+function setCategory(i){
+  state.cat = i; state.sound = 0;
+  catNameEl.textContent = CATEGORIES[i].name;
+  renderSegs();
+  if (state.calm) Audio.play(curSpec());
+}
+changeBtn.addEventListener('click', openSheet);
+scrim.addEventListener('click', closeSheet);
+
+/* ════ 평온 시작/끝내기 ════ */
 cta.addEventListener('click', () => {
   state.calm = !state.calm;
   if (state.calm) {
     app.classList.add('calm');
     cta.textContent = '평온 끝내기';
-    Audio.play(state.sound);
+    Audio.play(curSpec());
     startTimer();
-    dark = true; applyTheme(true);     // 평온 시작 → 밤
+    dark = true; applyTheme(true);      // 평온 시작 → 밤
   } else {
     app.classList.remove('calm');
-    cta.textContent = '평온 시작하기';
+    cta.textContent = pickPhrase();     // 끝낼 때 다음 문구를 새로 뽑음
     Audio.stop();
     stopTimer();
     dark = false; applyTheme(false);    // 평온 끝 → 낮
   }
 });
 
-segs.forEach((s, i) => s.addEventListener('click', () => {
-  state.sound = s.dataset.sound;
-  segs.forEach(b => b.classList.toggle('active', b === s));
-  moveIndicator(i);
-  if (state.calm) Audio.play(state.sound);
-}));
-
-muteBtn.addEventListener('click', () => {
-  state.muted = !state.muted;
-  muteBtn.textContent = state.muted ? '소리 켜기' : '소리 끄기';
-  muteBtn.classList.toggle('muted', state.muted);
-  Audio.setMuted(state.muted);
-});
-
-/* ════ 테마 ════ */
-function applyTheme(dark){ document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light'); themeBtn.textContent = dark ? '☀' : '☾'; }
-let dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-applyTheme(dark);
-themeBtn.addEventListener('click', () => { dark = !dark; applyTheme(dark); });
-
-function syncIndicator() {
-  const idx = [...segs].findIndex(s => s.classList.contains('active'));
-  moveIndicator(idx < 0 ? 0 : idx);
-}
-window.addEventListener('resize', syncIndicator);
+window.addEventListener('resize', () => moveIndicator(state.sound));
 
 /* ════ 초기화 ════ */
-syncIndicator();
+catNameEl.textContent = CATEGORIES[state.cat].name;
+renderSegs();
+cta.textContent = pickPhrase();
 </script>
 </body>
 </html>
